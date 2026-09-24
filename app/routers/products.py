@@ -1,16 +1,39 @@
-from fastapi import APIRouter
+import dbm
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select, insert, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.backend.db_depends import get_db
+from app.models.products import Product
+from app.routers.category import create_category
+from app.schemas import CreateProduct
+
+from slugify import slugify
 
 router = APIRouter(prefix='/products', tags=['products'])
 
 
 @router.get('/')
-async def all_products():
-    pass
+async def all_products(db: Annotated[AsyncSession, Depends(get_db)]):
+    products = await db.scalars(select(Product).where(Product.is_active == True))
+    return products.all()
 
 
 @router.post('/create')
-async def create_product():
-    pass
+async def create_product(db: Annotated[AsyncSession, Depends(get_db)], create_product: CreateProduct):
+    await db.execute(insert(Product).values(name=create_product.name,
+                                            description=create_product.description,
+                                            price=create_product.price,
+                                            image_url=create_product.image_url,
+                                            stock=create_product.stock,
+                                            slug=slugify(create_product.name)))
+    await db.commit()
+    return {
+        'status_code': status.HTTP_201_CREATED,
+        'transaction': 'Successful'
+    }
 
 
 @router.get('/{category_slug}')
