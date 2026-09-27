@@ -38,11 +38,10 @@ async def create_product(db: Annotated[AsyncSession, Depends(get_db)], create_pr
 
 
 @router.get('/{category_slug}')
-async def product_by_category(db: Annotated[AsyncSession, Depends(get_db)], category_slug: str) -> HTTPException | \
-                                                                                                   Sequence[Product]:
+async def product_by_category(db: Annotated[AsyncSession, Depends(get_db)], category_slug: str):
     category = await db.scalar(select(Category).where(Category.slug == category_slug))
     if category is None:
-        return HTTPException(
+        raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail='Category not found'
         )
@@ -57,11 +56,11 @@ async def product_by_category(db: Annotated[AsyncSession, Depends(get_db)], cate
 
 
 @router.get('/detail/{product_slug}')
-async def product_detail(db: Annotated[AsyncSession, Depends(get_db)], product_slug: str) -> HTTPException | Any:
+async def product_detail(db: Annotated[AsyncSession, Depends(get_db)], product_slug: str):
     product = await db.scalar(
         select(Product).where(Product.slug == product_slug, Product.is_active == True, Product.stock > 0))
     if product is None:
-        return HTTPException(
+        raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail='There are no product'
         )
