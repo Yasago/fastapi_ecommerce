@@ -1,14 +1,16 @@
-from fastapi import APIRouter, Depends, status, HTTPException
-from sqlalchemy import select, insert
-from app.models.user import User
-from app.schemas import CreateUser
-from app.backend.db_depends import get_db
-from typing import Annotated
-from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from datetime import datetime, timedelta
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import jwt, JWTError
 from passlib.context import CryptContext
+from sqlalchemy import select, insert
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.backend.db_depends import get_db
+from app.models.user import User
+from app.schemas import CreateUser
 
 SECRET_KEY = 'cc6e2e67b8599a528a12e7cc6b9a91427f77011fe1d0553eac7af0acfc11c5ca'
 ALGORITHM = 'HS256'
@@ -31,36 +33,65 @@ async def authenticate_user(db: Annotated[AsyncSession, Depends(get_db)], userna
 
 async def create_access_token(username: str, user_id: int, is_admin: bool, is_supplier: bool, is_customer: bool,
                               expires_delta: timedelta):
-    encode = {'sub': username, 'id': user_id, 'is_admin': is_admin, 'is_supplier': is_supplier,
-              'is_customer': is_customer}
+    encode: dict[str, str | int | bool | datetime] = {'sub': username, 'id': user_id, 'is_admin': is_admin,
+                                                      'is_supplier': is_supplier,
+                                                      'is_customer': is_customer}
     expires = datetime.now() + expires_delta
     encode.update({'exp': expires})
     return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
+async def get_current_user(
+        token: Annotated[str, Depends(oauth2_scheme)]
+):
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get('sub')
-        user_id: int = payload.get('id')
-        is_admin: str = payload.get('is_admin')
-        is_supplier: str = payload.get('is_supplier')
-        is_customer: str = payload.get('is_customer')
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+        username = payload.get('sub')
+        user_id = payload.get('id')
+        is_admin = payload.get('is_admin')
+        is_supplier = payload.get('is_supplier')
+        is_customer = payload.get('is_customer')
         expire = payload.get('exp')
-        if username is None or user_id is None:
+
+        if not isinstance(username, str) or not isinstance(user_id, int):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail='Could not validate user'
             )
-        if expire is None:
+
+        if not isinstance(is_admin, bool):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail='Invalid is_admin claim'
+            )
+
+        if not isinstance(is_supplier, bool):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail='Invalid is_supplier claim'
+            )
+
+        if not isinstance(is_customer, bool):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail='Invalid is_customer claim'
+            )
+
+        if not isinstance(expire, (int, float)):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No access token supplied"
+                detail='No valid expiration supplied'
             )
-        if datetime.now() > datetime.fromtimestamp(expire):
+
+        if datetime.now().timestamp() > expire:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Token expired!"
+                detail='Token expired!'
             )
 
         return {

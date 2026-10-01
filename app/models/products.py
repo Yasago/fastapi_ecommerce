@@ -1,7 +1,9 @@
-from app.backend.db import Base
-from sqlalchemy import Column, ForeignKey, Integer, String, Boolean, Float
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
+
+from app.backend.db import Base
 from app.models import *
+
 
 class Product(Base):
     __tablename__ = 'products'
